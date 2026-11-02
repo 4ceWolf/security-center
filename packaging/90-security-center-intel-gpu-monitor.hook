@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/bin/intel_gpu_top
+
+[Action]
+Description = Restore owner-scoped Intel GPU monitoring permission
+When = PostTransaction
+Exec = /usr/bin/python3 -I /usr/local/libexec/security-center-intel-gpu-monitor-permissions.py

@@ -1,0 +1,1512 @@
+CURRENT SCOPE AMENDMENT — NETWORKING OWNER-MANAGED, 2026-10-20
+The owner requested complete OpenSnitch removal and deferred its integration to ideas.
+Remove its package, service, GUI, startup configuration and dashboard controls.
+Preserve existing unrelated firewall rules. Do not implement network management.
+Existing firewall/listener observations remain read-only. This supersedes conflicting
+application-firewall requirements below. Historical evidence may be retained inert.
+
+CURRENT SCOPE AMENDMENT — 2026-10-20
+The owner deferred TPM automatic-unlock repair to future ideas. It is not an active
+completion requirement. Keep the existing review/design for reference. Add a Cockpit
+button to disable TPM automatic unlock, with administrator authorization, exact-state
+review, native disk-passphrase verification, protected header backup and manual slot0
+preservation. Building/installing the button does not authorize disabling it now.
+This amendment supersedes earlier repair-implementation requirements below.
+
+CURRENT SCOPE AMENDMENT — PREBOOT REMOVED, 2026-10-19
+The owner removed custom preboot device enforcement from scope. Custom initrd
+observation/handover rollout, archive/control builds, device-gated TPM unlock,
+hotplug/DMA preboot enforcement and their remaining firmware test matrix are no
+longer completion requirements. Keep historical source, tests and reports inert
+for reference. Do not deploy or continue these features. Existing Secure Boot,
+lockdown integrity, TPM automatic disk unlock and manual LUKS recovery stay in use.
+Continue postboot device protection, application/network controls, telemetry,
+Cockpit, recovery documentation and final validation. Add an on-demand automatic-
+unlock recovery workflow: diagnose first; any actual TPM reenrollment needs a
+reviewed, authenticated transaction preserving manual slot0 and existing PCR policy.
+This amendment supersedes every conflicting older preboot instruction below.
+Distress remains removed.
+
+CURRENT SCOPE AMENDMENT — 2026-10-19
+The owner removed Distress Mode from this project. Phase 6 and every Distress-specific
+requirement below are historical and no longer acceptance criteria. Do not build,
+deploy, enable, or request approvals for Distress, its credentials, shutdown flow,
+antirollback witness, or restoration protocol. Existing prototypes stay as historical
+reference only; shared normal-boot validation code may be retained where needed.
+Continue normal preboot device enforcement, preserving manual LUKS recovery and the
+existing boot safeguards. The original brief follows for traceability.
+
+PROJECT: ARCH LINUX UNIFIED SECURITY CENTER + PREBOOT/POSTBOOT SECURITY HANDOVER
+
+Goal:
+Build a modular, lightweight, Defender-style security architecture for my Arch Linux laptop.
+
+The system should combine:
+
+1. Preboot security
+2. Secure Boot / measured boot / TPM-backed LUKS
+3. A trusted preboot -> postboot security handover
+4. A Cockpit-based postboot Security Center
+5. Wazuh-like security monitoring/features without running full Wazuh
+6. Device security
+7. A temporary, NON-DESTRUCTIVE "Distress Mode"
+8. Full documentation of everything under ~/Projects/
+
+Do NOT replace my existing working boot-security configuration blindly.
+Inspect the machine first.
+Preserve recovery paths.
+Make changes incrementally and test each stage.
+
+
+======================================================================
+CURRENT MACHINE / EXISTING SECURITY
+======================================================================
+
+OS:
+- Arch Linux
+- systemd
+- mkinitcpio/systemd-style initramfs
+- Btrfs
+- Snapper
+- Secure Boot
+- TPM2
+- LUKS2 encrypted root
+
+Laptop:
+- Lenovo V15 G3 IAP
+- Intel i5-1235U
+- limited RAM, so keep the security stack lightweight
+
+Existing protections include:
+- Secure Boot
+- LUKS2 root encryption
+- TPM2 automatic LUKS unlock
+- normal manual LUKS passphrase fallback
+- Btrfs + Snapper
+- fallback/recovery-oriented boot setup
+
+
+======================================================================
+IMPORTANT: CURRENT TPM CONFIGURATION
+======================================================================
+
+The TPM/LUKS system recently stopped automatically unlocking after a BIOS
+USB-boot setting was changed.
+
+The failure was diagnosed as:
+
+    TPM policy does not match current system state
+
+The TPM itself was NOT cleared/reset.
+
+The old TPM enrollment used:
+
+- direct PCR binding:
+    PCR 7
+
+- signed PCR policy:
+    PCR 11
+
+- PCR bank:
+    SHA-256
+
+- signed policy reference:
+    initrd
+
+- TPM SRK:
+    enabled
+
+- TPM PIN:
+    disabled
+
+- PCRLock:
+    disabled
+
+The existing public key embedded in the LUKS TPM token was extracted and
+reused.
+
+Before changing the TPM enrollment, a LUKS header backup was created:
+
+    /home/user/Projects/security-center/docs/recovery-backups/luks-header-before-tpm-reenroll.img
+
+Permissions:
+
+    root:root
+    0600
+
+The TPM enrollment was repaired with approximately:
+
+    systemd-cryptenroll \
+        --wipe-slot=tpm2 \
+        --tpm2-device=auto \
+        --tpm2-pcrs=7 \
+        --tpm2-public-key=<recovered existing TPM PCR public key> \
+        --tpm2-public-key-pcrs=11 \
+        --tpm2-public-key-policyref=initrd \
+        /dev/nvme0n1p2
+
+Result:
+
+    New TPM2 token enrolled as key slot 2.
+    Wiped slot 1.
+
+CURRENT LUKS KEY SLOTS:
+
+    keyslot 0
+        normal manual LUKS passphrase
+        Argon2id
+
+    keyslot 2
+        TPM2 automatic unlock
+
+Current TPM token contains:
+
+    tpm2-hash-pcrs:   7
+    tpm2-pcr-bank:    sha256
+    tpm2-pubkey-ref:  initrd
+    tpm2-pubkey-pcrs: 11
+    tpm2-primary-alg: rsa
+    tpm2-pin:         false
+    tpm2-pcrlock:     false
+    tpm2-srk:         true
+
+Secure Boot currently reports:
+
+    Secure Boot: enabled (user)
+
+TPM auto-unlock now WORKS again.
+
+IMPORTANT:
+
+DO NOT:
+- clear/reset the TPM
+- delete keyslot 0
+- remove the manual LUKS passphrase fallback
+- casually alter PCR7/PCR11 policy
+- regenerate the TPM public key without understanding the signed PCR11 setup
+- wipe LUKS slots without verified recovery
+
+Any changes involving TPM/LUKS must account for the existing:
+
+    PCR 7 + signed PCR 11 + policyref=initrd
+
+configuration.
+
+
+======================================================================
+OVERALL ARCHITECTURE
+======================================================================
+
+Desired architecture:
+
+                    PREBOOT SECURITY
+                          |
+                          v
+              Secure Boot / TPM / LUKS
+                          |
+                          v
+                Preboot Device Gate
+                          |
+                          v
+              Trusted Boot-State Record
+                          |
+              ==========================
+                   TRUST HANDOVER
+              ==========================
+                          |
+                          v
+                    securityd
+                          |
+          +---------------+---------------+
+          |               |               |
+          v               v               v
+       Cockpit        event bus       policy modules
+    Security Center
+          |
+          +------------------------------------------------------+
+          |          |          |       |      |       |         |
+        TPM      AppArmor   nftables  USB   FIM   audit    updates
+                              /
+                         OpenSnitch
+
+The dashboard itself must NOT be required for enforcement.
+
+If Cockpit/securityd crashes:
+
+- AppArmor keeps enforcing
+- nftables keeps enforcing
+- USBGuard keeps enforcing
+- LUKS/TPM remains independent
+- systemd security services remain active
+
+Cockpit/securityd is:
+
+    control plane
+    dashboard
+    event aggregator
+    policy interface
+
+NOT the only security boundary.
+
+
+======================================================================
+COCKPIT SECURITY CENTER
+======================================================================
+
+Use Cockpit as the frontend framework.
+
+Do NOT install full Wazuh locally because it is unnecessarily heavy for this
+laptop.
+
+However, reproduce useful Wazuh-like endpoint-security features with smaller
+native Linux components.
+
+Tentative backend daemon:
+
+    securityd
+
+securityd should provide a modular API using preferably:
+
+    D-Bus
+
+or, if simpler initially:
+
+    local JSON API/socket
+
+Each module should expose something conceptually like:
+
+    id
+    name
+    status
+    severity
+    summary
+    description
+    last_check
+    details
+    events[]
+    actions[]
+
+Example modules:
+
+    secureboot
+    tpm
+    luks
+    preboot
+    firewall
+    opensnitch
+    apparmor
+    usbguard
+    integrity
+    audit
+    processes
+    services
+    malware
+    updates
+    snapshots
+    distress-mode
+
+Modules must fail independently.
+
+If one module dies:
+
+    Security Center shows MODULE UNAVAILABLE
+
+rather than crashing globally.
+
+
+======================================================================
+COCKPIT UI
+======================================================================
+
+Desired pages:
+
+    Overview
+    Boot Security
+    Network
+    Applications
+    Devices
+    Integrity
+    Threats
+    Audit
+    Updates
+    Recovery
+    Distress Mode
+    Settings
+
+Example overview:
+
+    SECURITY STATUS                      SECURE
+
+    Boot Integrity          SECURE
+    Secure Boot             VERIFIED
+    TPM / LUKS              SECURE
+    Preboot Device Gate     CLEAN
+    Firewall                SECURE
+    Network Activity        2 WARNINGS
+    AppArmor                SECURE
+    USB Security            SECURE
+    File Integrity          1 CHANGE
+    Malware Scan            CLEAN
+    Updates                 3 AVAILABLE
+    Snapshots               HEALTHY
+
+Use:
+
+    GREEN   secure
+    YELLOW  attention
+    RED     action required
+
+Avoid making the entire system RED because of one harmless warning.
+
+UI should provide both:
+
+1. normal human-readable state
+
+    "Secure"
+    "Warning"
+    "Action required"
+
+AND
+
+2. advanced technical details
+
+    PCRs
+    hashes
+    systemd units
+    journal messages
+    USB IDs
+    nftables rules
+    AppArmor profiles
+    file hashes
+    LUKS tokens
+    etc.
+
+
+======================================================================
+BOOT SECURITY MODULE
+======================================================================
+
+Show:
+
+- Secure Boot state
+- TPM present/absent
+- TPM usable/unusable
+- PCR state
+- LUKS status
+- TPM token information
+- current TPM LUKS keyslot
+- manual recovery slot present
+- whether boot used TPM auto-unlock or manual recovery if detectable
+- signed PCR11 policy status
+- PCR7 status
+- boot trust state
+- changes since previous boot
+
+Dangerous actions MUST be separated behind explicit confirmation.
+
+Examples:
+
+    Re-enroll TPM
+    Change PCR policy
+    Regenerate initramfs security material
+
+must never happen automatically.
+
+
+======================================================================
+PREBOOT DEVICE SECURITY
+======================================================================
+
+Future feature:
+
+TPM automatic LUKS unlock should ONLY be allowed if the machine boots with an
+acceptable external-device state.
+
+Desired normal rule:
+
+Before LUKS automatic unlock:
+
+ALLOW or IGNORE:
+
+    laptop internal hardware
+    power/charger
+    internal display
+    normal external monitor where appropriate
+    explicitly trusted peripherals
+
+Possible trusted exceptions later:
+
+    known mouse
+    known keyboard
+    trusted dock
+
+DENY TPM AUTO-UNLOCK if an unknown external device exists, particularly:
+
+    USB mass storage
+    unknown USB device
+    phones
+    USB Ethernet
+    unknown hubs
+    unknown HID devices
+    suspicious Thunderbolt/USB4/PCIe devices
+    unexpected boot media
+
+Important:
+
+If device-gate policy fails:
+
+    DO NOT BRICK THE LAPTOP
+
+Instead:
+
+    TPM automatic unlock is unavailable
+    manual LUKS passphrase must be entered
+
+Once Linux is fully booted, devices may be connected according to normal
+postboot USBGuard/security policy.
+
+Do NOT merely allow every device claiming to be a mouse.
+
+Where useful, identify trusted devices by combinations of:
+
+    VID:PID
+    serial
+    USB interfaces
+    physical port
+    device topology
+
+The preboot device checker should run in initramfs BEFORE TPM-backed root
+unlock.
+
+
+======================================================================
+PREBOOT -> POSTBOOT TRUST HANDOVER
+======================================================================
+
+Create a trustworthy handover from initramfs to the running OS.
+
+Example state:
+
+    boot_id=<boot identifier>
+
+    secure_boot=verified
+    tpm_present=true
+    tpm_luks_unlock=verified
+    pcr7=verified
+    pcr11=authorized
+    preboot_devices=clean
+    distress_mode=false
+
+The normal OS should consume this after root mounts.
+
+Cockpit should display states such as:
+
+GREEN:
+
+    VERIFIED BOOT
+    TPM/Secure Boot chain verified
+
+YELLOW:
+
+    RECOVERY BOOT
+    manual LUKS passphrase used
+    TPM verification unavailable
+
+RED:
+
+    PREBOOT POLICY FAILURE
+    unexpected boot/device/security state
+
+Do NOT trust a trivial normal-userspace writable text file as authoritative.
+
+Where practical, make the handover difficult to forge.
+
+Possible mechanisms to investigate:
+
+- initramfs-generated runtime state
+- TPM-backed state
+- boot ID binding
+- signed handover record
+- kernel keyring
+- systemd credentials
+- measured/signed boot state
+- root-only protected volatile storage
+
+Document the chosen trust model.
+
+
+======================================================================
+NETWORK / FIREWALL SECURITY
+======================================================================
+
+Integrate:
+
+    nftables
+    OpenSnitch
+
+Cockpit should show:
+
+- firewall active/inactive
+- current policy
+- recent blocked connections
+- recent allowed connections
+- application making connection
+- destination
+- port
+- protocol
+- unusual/suspicious destinations
+- rule status
+
+Possible actions:
+
+    allow application
+    deny application
+    temporary deny
+    temporary allow
+    inspect details
+
+Enforcement stays in nftables/OpenSnitch.
+
+
+======================================================================
+APPLICATION CONFINEMENT
+======================================================================
+
+Integrate:
+
+    AppArmor
+
+Show:
+
+- enabled/disabled
+- loaded profiles
+- enforce mode
+- complain mode
+- unconfined important applications
+- recent denials
+- profile errors
+- policy reload status
+
+Eventually allow safe profile-management workflows.
+
+
+======================================================================
+POSTBOOT USB SECURITY
+======================================================================
+
+Integrate:
+
+    USBGuard
+
+Show:
+
+- connected USB devices
+- trusted
+- blocked
+- unknown
+- VID:PID
+- serial
+- interfaces
+- port/path
+- connect/disconnect time
+- recent policy decisions
+
+Preboot device policy and postboot USBGuard policy should eventually be
+represented in the same UI.
+
+
+======================================================================
+FILE INTEGRITY MONITORING
+======================================================================
+
+Implement lightweight Wazuh-style FIM.
+
+Potential tools:
+
+    AIDE
+
+or custom:
+
+    fanotify/inotify
+    hash database
+
+Monitor SECURITY-IMPORTANT files, not the entire filesystem.
+
+Possible paths:
+
+    /etc
+    Secure Boot configuration
+    TPM configuration
+    initramfs configuration
+    bootloader configuration
+    systemd units
+    AppArmor profiles
+    nftables configuration
+    USBGuard configuration
+    securityd configuration
+    Cockpit Security Center files
+
+Show:
+
+    file changed
+    file created
+    file deleted
+    previous hash
+    current hash
+    ownership
+    permissions
+    package owner if known
+    timestamp
+    severity
+
+Try to distinguish:
+
+    expected package update
+
+from:
+
+    unexpected modification
+
+
+======================================================================
+SECURITY CONFIGURATION ASSESSMENT
+======================================================================
+
+Implement Wazuh-like security configuration auditing using:
+
+    Lynis
+    custom Arch-specific checks
+
+Possible checks:
+
+- Secure Boot enabled
+- TPM working
+- LUKS enabled
+- manual recovery keyslot available
+- firewall active
+- AppArmor active
+- kernel lockdown status
+- risky sysctl settings
+- unexpected listening ports
+- unnecessary services
+- world-writable sensitive files
+- unusual SUID/SGID files
+- failed security services
+- unsigned/unpackaged executables where meaningful
+- stale packages
+- available security updates
+- insecure permissions
+- initramfs state
+
+Each finding should contain:
+
+    severity
+    explanation
+    evidence
+    remediation suggestion
+
+DO NOT automatically apply every suggested "hardening" change.
+
+
+======================================================================
+MALWARE / THREAT SCANNING
+======================================================================
+
+Optional integration:
+
+    ClamAV
+
+Use primarily for:
+
+- downloaded files
+- manual scans
+- known malware signatures
+- suspicious-file triage
+
+Do NOT treat ClamAV as the primary Linux security mechanism.
+
+Possible later addition:
+
+    quarantine system
+
+but only if designed carefully and reversibly.
+
+
+======================================================================
+PROCESS / SERVICE MONITORING
+======================================================================
+
+Show:
+
+- running security-sensitive processes
+- listening services
+- newly created services
+- newly enabled systemd services
+- failed security units
+- unexpected persistence
+- executables outside package manager ownership where interesting
+- unusual privileged processes
+- recently changed service definitions
+
+Avoid noisy "everything is malware" heuristics.
+
+
+======================================================================
+SECURITY EVENT TIMELINE
+======================================================================
+
+Create one central event timeline.
+
+Example:
+
+    17:03  Secure Boot verified
+    17:03  TPM-backed LUKS unlock succeeded
+    17:03  Preboot device check passed
+    17:04  AppArmor denied file access
+    17:08  USB device connected
+    17:10  OpenSnitch blocked connection
+    17:22  Integrity monitor detected /etc/... modification
+
+Potential event sources:
+
+    journald
+    AppArmor
+    nftables
+    OpenSnitch
+    USBGuard
+    securityd
+    preboot handover
+    audit subsystem
+    FIM
+
+Implement:
+
+    severity normalization
+    deduplication
+    timestamps
+    boot ID
+    module/source
+    searchable history
+
+
+======================================================================
+DISTRESS MODE
+======================================================================
+
+Name this feature:
+
+    DISTRESS MODE
+
+This must be NON-DESTRUCTIVE.
+
+NO:
+
+    disk wiping
+    LUKS key destruction
+    TPM clearing
+    random file deletion
+    destructive anti-forensics
+    permanent configuration damage
+
+Distress mode should be TEMPORARY and automatically reversible.
+
+
+======================================================================
+DISTRESS-MODE TRIGGER
+======================================================================
+
+Eventually allow a special distress credential/PIN to be entered through
+system authentication surfaces.
+
+Desired coverage includes login/lock authentication where technically safe
+and feasible, such as:
+
+    SDDM / KDE login
+    KDE lock screen
+    Niri environment lock/login mechanism
+    PAM-mediated login paths
+
+Do NOT create separate insecure password databases unnecessarily.
+
+Investigate a proper PAM-integrated design.
+
+The distress credential must be strongly separated from the normal account
+credential and must NOT accidentally authenticate into the normal desktop.
+
+It should trigger an emergency state transition instead.
+
+
+======================================================================
+DISTRESS-MODE ACTIVATION BEHAVIOR
+======================================================================
+
+When the distress credential is accepted:
+
+1. Mark distress mode ACTIVE using protected system state.
+
+2. Record a security event:
+
+       DISTRESS MODE ACTIVATED
+
+   Include:
+
+       timestamp
+       boot ID
+       session
+       relevant security state
+
+3. Optionally capture local evidence ONLY where lawful/consensual and with
+   visible camera/microphone indicators.
+
+   Possible evidence:
+
+       one camera image
+       short microphone recording
+
+   Evidence must:
+
+       remain local
+       be encrypted/protected
+       have restrictive permissions
+       have timestamps
+       not silently upload anywhere
+       have retention controls
+       be clearly documented
+
+   Do NOT implement covert surveillance.
+
+4. Initiate a SECURE SYSTEM SHUTDOWN.
+
+Display a message such as:
+
+       Emergency mode activated.
+       System is securing itself.
+
+5. Distress-mode state must survive that shutdown and affect the NEXT boot.
+
+
+======================================================================
+DISTRESS-MODE NEXT-BOOT POLICY
+======================================================================
+
+On the boot immediately following distress-mode activation:
+
+TPM automatic LUKS unlock MUST BE TEMPORARILY DISABLED.
+
+IMPORTANT:
+
+Do NOT destroy/remove TPM enrollment just to accomplish this.
+
+Prefer a temporary policy gate that prevents TPM auto-unlock while distress
+state is active.
+
+Manual LUKS passphrase must be required.
+
+Additionally:
+
+NO external device may be connected during this special boot except:
+
+    power
+
+Preferably reject/disable automatic trusted-device exceptions too.
+
+Therefore distress boot should require approximately:
+
+    power only
+        |
+        v
+    preboot external-device check
+        |
+        v
+    manual LUKS passphrase
+        |
+        v
+    OS boot
+        |
+        v
+    normal user/root authentication
+        |
+        v
+    restricted distress session/state
+
+An external monitor, mouse, storage device, phone, dock, etc. should prevent
+the normal distress recovery boot path unless we later deliberately change
+this policy.
+
+Again:
+
+DO NOT brick the machine.
+
+Provide a clearly documented manual recovery path.
+
+
+======================================================================
+DISTRESS-MODE WHILE SYSTEM IS RUNNING
+======================================================================
+
+If the machine is deliberately booted while distress mode remains active:
+
+- Security Center must show a prominent:
+
+      DISTRESS MODE ACTIVE
+
+- TPM auto-unlock remains unavailable for that distress cycle.
+
+- Maintain a security event log.
+
+- Network policy may optionally be hardened/disabled depending on final design.
+
+- Camera/microphone evidence capture may continue ONLY if:
+    - locally configured
+    - lawful/consensual
+    - visibly indicated
+    - not covert
+    - stored locally and securely
+    - explicitly documented
+
+Do not upload evidence automatically.
+
+
+======================================================================
+DISTRESS-MODE RESTORATION
+======================================================================
+
+Desired behavior:
+
+After the owner successfully performs the distress boot using:
+
+    manual LUKS passphrase
+    +
+    valid normal user/root authentication
+
+the system may mark:
+
+    owner recovery verified
+
+However, keep distress protections active until the owner subsequently performs
+a NORMAL REBOOT.
+
+On that next reboot:
+
+restore the exact PRE-DISTRESS security behavior.
+
+That means restore:
+
+- normal TPM automatic unlock
+- normal PCR7/PCR11 behavior
+- normal preboot device policy
+- normal trusted-device exceptions
+- normal USBGuard policy
+- normal firewall policy
+- normal desktop/login behavior
+- normal Security Center state
+
+Do not permanently modify TPM enrollment to implement temporary distress mode.
+
+Think of distress mode as a STATE MACHINE:
+
+    NORMAL
+      |
+      | distress credential
+      v
+    DISTRESS_TRIGGERED
+      |
+      | secure shutdown
+      v
+    DISTRESS_BOOT_REQUIRED
+      |
+      | power-only device state
+      | manual LUKS
+      | normal owner authentication
+      v
+    DISTRESS_RECOVERY_SESSION
+      |
+      | owner performs normal reboot
+      v
+    NORMAL
+
+The restoration should be deterministic.
+
+If restoration fails:
+
+    remain secure
+    require manual recovery
+
+Do not fail open.
+
+
+======================================================================
+IMPORTANT DISTRESS-MODE IMPLEMENTATION PRINCIPLE
+======================================================================
+
+DO NOT implement distress mode by repeatedly enrolling/removing TPM slots.
+
+That risks:
+
+- losing keys
+- corrupting recovery assumptions
+- breaking PCR policies
+- accidental lockout
+
+Instead investigate a reversible external gate controlling WHETHER the system
+is allowed to ATTEMPT TPM unlock.
+
+Examples to investigate:
+
+- initramfs policy state
+- systemd cryptsetup ordering/condition
+- signed state token
+- TPM NV state if appropriate and safely designed
+- systemd credentials
+- protected EFI variable if trustworthy
+- initramfs-visible protected flag
+
+The TPM token itself should ideally remain intact.
+
+
+======================================================================
+DISTRESS EVIDENCE STORAGE
+======================================================================
+
+If evidence recording is implemented:
+
+Suggested location concept:
+
+    /var/lib/securityd/distress/
+
+NOT normal user Documents/Desktop.
+
+Permissions should be restrictive.
+
+Consider:
+
+    root-only
+    encryption
+    hashes
+    immutable metadata where appropriate
+    retention period
+    owner-controlled deletion after recovery
+
+Security Center should display:
+
+    Distress activation time
+    Evidence present
+    Camera image present
+    Audio recording present
+    integrity hashes
+
+Again:
+
+NO hidden uploads.
+NO covert surveillance.
+NO destructive behavior.
+
+
+======================================================================
+RECOVERY PAGE
+======================================================================
+
+Cockpit Security Center should eventually have a Recovery page showing:
+
+- manual LUKS fallback available
+- LUKS keyslots
+- TPM enrollment status
+- LUKS header backup status
+- Snapper state
+- fallback kernel
+- distress-mode state
+- preboot device-gate state
+- last known good boot
+- recovery documentation location
+
+Dangerous operations must require explicit confirmation.
+
+
+======================================================================
+DOCUMENTATION REQUIREMENT
+======================================================================
+
+DOCUMENT EVERYTHING.
+
+Store project material under:
+
+    ~/Projects/
+
+Create a sensible hierarchy, for example:
+
+    ~/Projects/security-center/
+
+Potential structure:
+
+    ~/Projects/security-center/
+    ├── README.md
+    ├── docs/
+    │   ├── architecture.md
+    │   ├── threat-model.md
+    │   ├── boot-security.md
+    │   ├── tpm-luks-current-state.md
+    │   ├── preboot-device-gate.md
+    │   ├── handover-design.md
+    │   ├── distress-mode.md
+    │   ├── recovery.md
+    │   └── testing.md
+    │
+    ├── securityd/
+    │
+    ├── cockpit/
+    │
+    ├── modules/
+    │   ├── secureboot/
+    │   ├── tpm/
+    │   ├── luks/
+    │   ├── firewall/
+    │   ├── apparmor/
+    │   ├── usbguard/
+    │   ├── integrity/
+    │   └── distress/
+    │
+    ├── initramfs/
+    │
+    ├── policies/
+    │
+    ├── tests/
+    │
+    └── backups/
+
+Document BEFORE and AFTER states for important security changes.
+
+For every major change record:
+
+    purpose
+    files modified
+    commands used
+    previous state
+    new state
+    security implications
+    recovery instructions
+    rollback instructions
+    test result
+
+Specifically create documentation of the TPM repair already performed.
+
+Include:
+
+    root device:
+        /dev/nvme0n1p2
+
+    TPM old slot:
+        1
+
+    TPM current slot:
+        2
+
+    normal manual LUKS slot:
+        0
+
+    PCR direct binding:
+        7
+
+    signed PCR:
+        11
+
+    PCR bank:
+        SHA-256
+
+    policy reference:
+        initrd
+
+    Secure Boot:
+        enabled
+
+    TPM re-enrollment succeeded and automatic LUKS unlock currently works.
+
+
+======================================================================
+PRIVILEGE / SECURITY MODEL
+======================================================================
+
+Keep privileges separated.
+
+Cockpit frontend should NOT simply execute arbitrary root shell commands.
+
+Prefer:
+
+    Cockpit UI
+        |
+        v
+    securityd API
+        |
+        v
+    polkit-authorized privileged helper
+        |
+        v
+    specific security operation
+
+Use narrow, explicit privileged actions.
+
+Avoid:
+
+    shell=True style execution
+    arbitrary command strings
+    unsafe sudo wrappers
+    world-writable sockets
+
+Prefer:
+
+    D-Bus
+    systemd services
+    polkit
+    capability minimization
+    root-owned config
+    structured journald events
+
+
+======================================================================
+IMPLEMENTATION PHASES
+======================================================================
+
+DO NOT BUILD EVERYTHING AT ONCE.
+
+PHASE 0
+-------
+
+Inspect system.
+
+Document:
+
+- boot process
+- mkinitcpio hooks
+- Secure Boot setup
+- TPM state
+- LUKS metadata
+- current firewall
+- AppArmor availability
+- Cockpit availability
+- OpenSnitch state
+- USB state
+- systemd services
+- snapshot/recovery setup
+
+Create:
+
+    ~/Projects/security-center/
+
+
+PHASE 1 - SAFE MVP
+------------------
+
+Build:
+
+1. Cockpit custom Security Center page
+2. lightweight securityd
+3. module/status API
+4. Secure Boot module
+5. TPM module
+6. LUKS module
+7. firewall status module
+8. AppArmor status module
+9. basic journald-backed event timeline
+10. overall health status
+
+READ-ONLY FIRST.
+
+
+PHASE 2
+-------
+
+Add:
+
+- OpenSnitch integration
+- USBGuard integration
+- update status
+- Snapper/recovery status
+- process/service monitoring
+
+
+PHASE 3
+-------
+
+Add:
+
+- Lynis/custom security auditing
+- file integrity monitoring
+- optional ClamAV
+- richer event correlation
+
+
+PHASE 4
+-------
+
+Build trusted:
+
+    preboot -> postboot security handover
+
+
+PHASE 5
+-------
+
+Build normal:
+
+    preboot external-device gate
+
+where unknown devices disable automatic TPM unlock but preserve manual LUKS
+recovery.
+
+
+PHASE 6
+-------
+
+Design and test Distress Mode.
+
+Start with ONLY:
+
+    distress state
+    secure shutdown
+    temporary TPM-auto-unlock gate
+    manual recovery boot
+    normal-state restoration
+
+Do NOT initially add camera/microphone.
+
+Only after core distress-state handling is reliable should optional local,
+visible, lawful evidence recording be considered.
+
+
+======================================================================
+TESTING REQUIREMENTS
+======================================================================
+
+Every security feature needs failure testing.
+
+Examples:
+
+TPM:
+    normal boot
+    changed firmware state
+    missing TPM
+    manual LUKS recovery
+
+Preboot devices:
+    no devices
+    allowed device
+    unknown USB device
+    mass storage
+    external hub
+
+securityd:
+    module crash
+    daemon crash
+    Cockpit unavailable
+
+Distress:
+    distress credential
+    power-only recovery boot
+    wrong LUKS passphrase
+    correct manual LUKS passphrase
+    external device connected
+    owner authentication
+    reboot restoration
+    interrupted shutdown
+    unexpected power loss
+
+Ensure every scenario has a safe recovery path.
+
+
+======================================================================
+GENERAL RULES
+======================================================================
+
+1. Preserve manual LUKS recovery.
+
+2. Never clear TPM automatically.
+
+3. Never destroy encryption keys automatically.
+
+4. Never permanently alter security policy to implement a temporary mode.
+
+5. Never make Cockpit a security single point of failure.
+
+6. Do not weaken PCR7/PCR11 measured-boot protection.
+
+7. Default to read-only monitoring before adding controls.
+
+8. Make privileged actions explicit and auditable.
+
+9. Use journald structured logging where useful.
+
+10. Keep resource usage low.
+
+11. Document everything in ~/Projects/security-center/.
+
+12. Before risky modifications:
+       explain the change
+       show rollback
+       verify recovery
+       then make the change
+
+13. Fail secure but remain recoverable.
+
+14. Treat distress mode as a reversible state transition, not a destructive
+    action.
+
+15. Before implementing anything, produce:
+       current-state audit
+       architecture proposal
+       threat model
+       implementation plan
+       rollback strategy
+
+
+======================================================================
+END GOAL
+======================================================================
+
+The end result should feel like a custom Linux equivalent of Windows Security,
+except substantially more modular:
+
+    PREBOOT
+        Secure Boot
+        TPM
+        PCR measured boot
+        LUKS
+        device gate
+
+             |
+             v
+
+        TRUST HANDOVER
+
+             |
+             v
+
+    POSTBOOT SECURITY CENTER
+        Cockpit
+        securityd
+        AppArmor
+        nftables
+        OpenSnitch
+        USBGuard
+        integrity monitoring
+        auditing
+        malware scanning
+        update security
+        snapshot/recovery monitoring
+        central security timeline
+
+             |
+             v
+
+        DISTRESS MODE
+
+        temporary hardened state
+        secure shutdown
+        no TPM auto-unlock on recovery boot
+        power-only external-device state
+        manual LUKS required
+        normal owner authentication required
+        security logging
+        eventual normal reboot restores the exact previous/default behavior
+
+The system should be secure, transparent, recoverable, well-documented, and
+extensible enough that future custom security modules can plug into the same
+Security Center.

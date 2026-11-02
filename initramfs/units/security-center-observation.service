@@ -1,0 +1,22 @@
+[Unit]
+Description=Security Center initrd inventory observation
+DefaultDependencies=no
+ConditionPathExists=/etc/initrd-release
+Wants=systemd-udev-trigger.service
+After=systemd-udev-trigger.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -I /usr/lib/security-center-observation/entry.py
+UMask=0077
+RuntimeDirectory=security-center-observation
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+RemainAfterExit=yes
+TimeoutStartSec=5
+TimeoutStopSec=1
+KillMode=control-group
+MemoryMax=64M
+StandardInput=null
+StandardOutput=null
+StandardError=journal

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "internal": [],
+  "trusted_external": [
+    {
+      "transport": "usb",
+      "vendor": "09da",
+      "product": "0025",
+      "serial": "",
+      "port": "pci:0000:00:14.0/usb:1",
+      "interfaces": [
+        "03:01:01",
+        "03:01:02"
+      ]
+    },
+    {
+      "transport": "usb",
+      "vendor": "046d",
+      "product": "c542",
+      "serial": "",
+      "port": "pci:0000:00:14.0/usb:1",
+      "interfaces": [
+        "03:01:02"
+      ]
+    }
+  ]
+}

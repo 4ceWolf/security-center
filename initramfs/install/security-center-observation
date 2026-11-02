@@ -1,0 +1,43 @@
+#!/usr/bin/bash
+# STAGED ONLY. A reviewed image package must provide all fixed installed inputs.
+build() {
+    local library f name
+    local payload=/usr/lib/security-center-observation
+    [[ -f /etc/security-center-observation/root-mapping ]] || return 1
+    local mapping
+    IFS= read -r mapping < /etc/security-center-observation/root-mapping
+    [[ $mapping =~ ^[A-Za-z0-9_-]{1,64}$ ]] || return 1
+    # The image builder must bind these installed inputs and all runtime additions
+    # to its captured manifest before approving/signing a candidate.
+    add_binary /usr/bin/python3 || return 1
+    library=$(/usr/bin/python3 -I -c 'import sysconfig; print(sysconfig.get_path("stdlib"))') || return 1
+    [[ $library == /usr/lib/python[0-9]* && -d $library ]] || return 1
+    for f in "$library"/*.py; do add_file "$f" || return 1; done
+    for name in encodings json re collections importlib pathlib logging; do
+        add_full_dir "$library/$name" '*.py' || return 1
+    done
+    for name in _posixsubprocess select math _opcode _struct _typing _json fcntl _hashlib _sha2 _blake2 _md5 _sha1 _sha3; do
+        for f in "$library/lib-dynload/$name".*.so; do
+            [[ -f $f ]] || continue
+            add_binary "$f" || return 1
+        done
+    done
+    for name in entry.py boot_observation.py boot_observer.py gate_observer.py gate_record.py device_gate.py device_inventory.py platform_inventory.py; do
+        [[ -f $payload/$name && ! -L $payload/$name ]] || return 1
+        add_file "$payload/$name" || return 1
+    done
+    for name in normal-devices.json source.sha256; do
+        add_file "/etc/security-center-observation/$name" || return 1
+    done
+    add_file /usr/lib/systemd/system/security-center-observation.service || return 1
+    # Mapping-specific, dependency-only file is prepared by the reviewed publisher.
+    # This hook never generates an ExecStart replacement or a template override.
+    add_file "/etc/systemd/system/systemd-cryptsetup@$mapping.service.d/50-security-center-observation.conf" || return 1
+}
+help() {
+    cat <<HELPEOF
+Include the reviewed passive Security Center observer in a separate systemd initrd.
+Requires a captured package and mapping-specific dependency-only drop-in. Staged;
+not approved for the normal boot preset. No runtime hook or unlock replacement.
+HELPEOF
+}

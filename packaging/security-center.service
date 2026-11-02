@@ -1,0 +1,39 @@
+[Unit]
+Description=Security Center read-only evidence collector
+After=local-fs.target machine-care-firewall.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -I /usr/local/lib/security-center/daemon.py
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=on-failure
+RestartSec=10
+User=root
+Group=wheel
+RuntimeDirectory=security-center
+RuntimeDirectoryMode=0750
+StateDirectory=security-center-monitor
+StateDirectoryMode=0750
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_NET_ADMIN
+DevicePolicy=closed
+DeviceAllow=/dev/nvme0n1p2 r
+MemoryHigh=48M
+MemoryMax=80M
+TasksMax=32
+CPUQuota=20%
+ReadWritePaths=/run/security-center
+
+[Install]
+WantedBy=multi-user.target

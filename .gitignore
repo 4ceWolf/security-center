@@ -1,0 +1,12 @@
+backups/*
+!backups/.gitkeep
+__pycache__/
+*.pyc
+*.key
+*.pem
+*.img
+*.efi
+*.sqlite*
+
+# Private disk-encryption recovery material
+/docs/recovery-backups/

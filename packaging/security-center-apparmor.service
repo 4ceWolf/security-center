@@ -1,0 +1,20 @@
+[Unit]
+Description=Security Center selected AppArmor profiles
+Documentation=file:/home/user/Projects/security-center/docs/apparmor-selected-profiles.md
+ConditionSecurity=apparmor
+After=local-fs.target
+Before=avahi-daemon.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/apparmor_parser --replace --skip-cache --jobs 1 /etc/apparmor.d/usr.sbin.avahi-daemon /etc/apparmor.d/lsb_release
+ExecStop=/usr/bin/apparmor_parser --remove --skip-cache --jobs 1 /etc/apparmor.d/usr.sbin.avahi-daemon /etc/apparmor.d/lsb_release
+TimeoutStartSec=30
+TimeoutStopSec=30
+MemoryMax=64M
+TasksMax=8
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

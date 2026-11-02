@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "image_sha256": "2d4180ea48fd31d8354e7db770c0b60a4c7a5470452e09d72f2dfb8a296046e8",
+  "transitions": [
+    {
+      "path": "usr/lib/firmware",
+      "segment": 1,
+      "before": {
+        "mode": 16832,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      },
+      "after": {
+        "mode": 16877,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      }
+    },
+    {
+      "path": "usr/lib/firmware/cxgb4",
+      "segment": 1,
+      "before": {
+        "mode": 16832,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      },
+      "after": {
+        "mode": 16877,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      }
+    },
+    {
+      "path": "usr/lib/firmware/i915",
+      "segment": 1,
+      "before": {
+        "mode": 16832,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      },
+      "after": {
+        "mode": 16877,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      }
+    },
+    {
+      "path": "usr/lib/modules",
+      "segment": 1,
+      "before": {
+        "mode": 16832,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      },
+      "after": {
+        "mode": 16877,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      }
+    },
+    {
+      "path": "usr/lib/modules/7.2.10-zen1-1-zen",
+      "segment": 1,
+      "before": {
+        "mode": 16832,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      },
+      "after": {
+        "mode": 16877,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      }
+    },
+    {
+      "path": "usr/share",
+      "segment": 1,
+      "before": {
+        "mode": 16832,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      },
+      "after": {
+        "mode": 16877,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      }
+    },
+    {
+      "path": "usr/share/kbd",
+      "segment": 1,
+      "before": {
+        "mode": 16832,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      },
+      "after": {
+        "mode": 16877,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      }
+    },
+    {
+      "path": "usr/share/kbd/keymaps",
+      "segment": 1,
+      "before": {
+        "mode": 16832,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      },
+      "after": {
+        "mode": 16877,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      }
+    },
+    {
+      "path": "usr/share/kbd/keymaps/i386",
+      "segment": 1,
+      "before": {
+        "mode": 16832,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      },
+      "after": {
+        "mode": 16877,
+        "uid": 0,
+        "gid": 0,
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mtime": 0
+      }
+    }
+  ]
+}
